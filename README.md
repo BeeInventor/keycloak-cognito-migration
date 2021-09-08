@@ -27,5 +27,6 @@ If yes, the plugin will create a new user in the Keycloak local database with th
 References:
 
 - https://www.keycloak.org/docs/latest/server_development/#_user-storage-spi
+- https://www.keycloak.org/docs/latest/server_development/#import-implementation-strategy
 - https://www.keycloak.org/docs-api/15.0/javadocs/
 - https://github.com/Smartling/keycloak-user-migration-provider

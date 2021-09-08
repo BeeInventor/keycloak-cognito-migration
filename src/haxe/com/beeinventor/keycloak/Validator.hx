@@ -4,11 +4,12 @@ import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProviderClientBuilder;
+import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminInitiateAuthRequest;
 import com.amazonaws.services.cognitoidp.model.AuthFlowType;
 import java.util.HashMap;
 
-class Checker {
+class Validator {
 	
 	final region:String;
 	final userPoolId:String;
@@ -17,7 +18,7 @@ class Checker {
 	
 	final client:AWSCognitoIdentityProvider;
 		
-	public inline function new(config) {
+	public function new(config) {
 		region = config.region;
 		userPoolId = config.userPoolId;
 		clientId = config.clientId;
@@ -30,7 +31,20 @@ class Checker {
 			.build();
 	}
 	
-	public inline function check(username:String, password:String) {
+	public function exists(username:String):Bool {
+		return try {
+			final request =
+				new AdminGetUserRequest()
+					.withUserPoolId(userPoolId)
+					.withUsername(username);
+			final result = client.adminGetUser(request);
+			result.getEnabled();
+		} catch (ex) {
+			false;
+		}
+	}
+	
+	public function validate(username:String, password:String) {
 		return try {
 			final request =
 				new AdminInitiateAuthRequest()
@@ -49,7 +63,7 @@ class Checker {
 					});
 			final result = client.adminInitiateAuth(request);
 			final auth = result.getAuthenticationResult();
-			auth.getIdToken();
+			auth.getIdToken(); // TODO: return a proper user info object
 		} catch (ex) {
 			null;
 		}

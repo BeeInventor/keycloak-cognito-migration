@@ -16,12 +16,12 @@ class CognitoUserStorageProvider implements UserStorageProvider implements UserL
 	
 	final session:KeycloakSession;
 	final model:ComponentModel;
+	final validator:Validator;
 	
-	public function new(session, model) {
+	public function new(session, model, validator) {
 		this.session = session;
 		this.model = model;
-		
-		// model.getConfig(); // TODO: get aws keys from config
+		this.validator = validator;
 	}
 
 	public function close() {
@@ -50,21 +50,7 @@ class CognitoUserStorageProvider implements UserStorageProvider implements UserL
 		final username = user.getUsername();
 		final password = input.getChallengeResponse();
 		
-		trace(username, password);
-		
-		// https://www.keycloak.org/docs/latest/server_development/#import-implementation-strategy
-		
-			
-		final checker = new com.beeinventor.keycloak.Checker({
-			accessKeyId: model.getConfig().getFirst(CognitoUserStorageProviderFactory.AWS_ACCESS_KEY_ID),
-			secretAccessKey: model.getConfig().getFirst(CognitoUserStorageProviderFactory.AWS_SECRET_ACCESS_KEY),
-			region: model.getConfig().getFirst(CognitoUserStorageProviderFactory.AWS_REGION),
-			userPoolId: model.getConfig().getFirst(CognitoUserStorageProviderFactory.COGNITO_USER_POOL_ID),
-			clientId: model.getConfig().getFirst(CognitoUserStorageProviderFactory.COGNITO_CLIENT_ID),
-			clientSecret: model.getConfig().getFirst(CognitoUserStorageProviderFactory.COGNITO_CLIENT_SECRET),
-		});
-		
-		return switch checker.check(username, password) {
+		return switch validator.validate(username, password) {
 			case null:
 				false;
 			case remote:
@@ -81,15 +67,18 @@ class CognitoUserStorageProvider implements UserStorageProvider implements UserL
 	}
 
 	public overload function getUserByEmail(realm:RealmModel, email:String):UserModel {
-		// TODO: check with cognito that the specified email actually exists
-		return switch session.userLocalStorage().getUserByEmail(realm, email) {
-			case null:
-				final user = session.userLocalStorage().addUser(realm, email);
-				user.setEmail(email);
-				user.setFederationLink(model.getId());
-				user;
-			case user:
-				user;
+		return if(validator.exists(email)) {
+			switch session.userLocalStorage().getUserByEmail(realm, email) {
+				case null:
+					final user = session.userLocalStorage().addUser(realm, email);
+					user.setEmail(email);
+					user.setFederationLink(model.getId());
+					user;
+				case user:
+					user;
+			}
+		} else {
+			null;
 		}
 	}
 
@@ -98,7 +87,7 @@ class CognitoUserStorageProvider implements UserStorageProvider implements UserL
 	}
 
 	public overload function getUserById(realm:RealmModel, id:String):UserModel {
-		throw new haxe.exceptions.NotImplementedException();
+		return null;
 	}
 
 	public overload function getUserById(id:String, realm:RealmModel):UserModel {
@@ -106,7 +95,7 @@ class CognitoUserStorageProvider implements UserStorageProvider implements UserL
 	}
 
 	public overload function getUserByUsername(realm:RealmModel, username:String):UserModel {
-		throw new haxe.exceptions.NotImplementedException();
+		return null;
 	}
 
 	public overload function getUserByUsername(username:String, realm:RealmModel):UserModel {

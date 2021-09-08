@@ -97,7 +97,7 @@ class CognitoUserStorageProviderFactory implements UserStorageProviderFactory<Co
 		
 		inline function ensure(name:String) {
 			switch config.getFirst(name) {
-				case null: throw new ComponentValidationException('Missing config: $name');
+				case null | '': throw new ComponentValidationException('Missing config: $name');
 				case _: // ok
 			}
 		}
@@ -116,13 +116,22 @@ class CognitoUserStorageProviderFactory implements UserStorageProviderFactory<Co
 	public function close() {}
 
 	public overload function create(session:KeycloakSession):UserStorageProvider {
-		// default method:
+		// default method: 
 		// https://github.com/keycloak/keycloak/blob/cd342ad5714f15db1cc8b0cd55b788e6543c6dc8/server-spi/src/main/java/org/keycloak/component/ComponentFactory.java#L39
+		// haxe bug tracker: https://github.com/HaxeFoundation/haxe/issues/10328
 		return null;
 	}
 
 	public overload function create(session:KeycloakSession, model:ComponentModel):CognitoUserStorageProvider {
-		return new CognitoUserStorageProvider(session, model);
+		final validator = new Validator({
+			accessKeyId: model.getConfig().getFirst(AWS_ACCESS_KEY_ID),
+			secretAccessKey: model.getConfig().getFirst(AWS_SECRET_ACCESS_KEY),
+			region: model.getConfig().getFirst(AWS_REGION),
+			userPoolId: model.getConfig().getFirst(COGNITO_USER_POOL_ID),
+			clientId: model.getConfig().getFirst(COGNITO_CLIENT_ID),
+			clientSecret: model.getConfig().getFirst(COGNITO_CLIENT_SECRET),
+		});
+		return new CognitoUserStorageProvider(session, model, validator);
 	}
 
 	public function getId():String {
@@ -140,6 +149,7 @@ class CognitoUserStorageProviderFactory implements UserStorageProviderFactory<Co
 	public function getCommonProviderConfigProperties():java.util.List<ProviderConfigProperty> {
 		// default method:
 		// https://github.com/keycloak/keycloak/blob/cd342ad5714f15db1cc8b0cd55b788e6543c6dc8/server-spi/src/main/java/org/keycloak/storage/UserStorageProviderFactory.java#L110
+		// haxe bug tracker: https://github.com/HaxeFoundation/haxe/issues/10328
 		return UserStorageProviderSpi.commonConfig();
 	}
 
