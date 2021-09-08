@@ -1,0 +1,26 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "hxml",
+			"file": "build.hxml",
+			"problemMatcher": [
+				"$haxe-absolute",
+				"$haxe",
+				"$haxe-error",
+				"$haxe-trace"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"label": "haxe: build.hxml"
+		},
+		{
+			"type": "shell",
+			"command": "mvn compile assembly:single && cp target/keycloak-cognito-user-storage-1.0-jar-with-dependencies.jar .devcontainer/keycloak/deployments/",
+			"group": "build",
+			"label": "deploy"
+		}
+	]
+}

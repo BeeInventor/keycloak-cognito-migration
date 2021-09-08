@@ -1,0 +1,10 @@
+--class-path src/haxe
+--jvm bin/Main.jar
+--dce full
+
+com.beeinventor.keycloak.CognitoUserStorageProvider
+com.beeinventor.keycloak.CognitoUserStorageProviderFactory
+
+--java-lib-extern extern/javax-crypto.jar
+
+maven.hxml
