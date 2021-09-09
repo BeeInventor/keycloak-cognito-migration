@@ -12,7 +12,7 @@ import org.keycloak.models.UserModel;
 import org.keycloak.storage.user.UserLookupProvider;
 import org.keycloak.storage.UserStorageProvider;
 
-class CognitoUserStorageProvider implements UserStorageProvider implements UserLookupProvider implements CredentialInputValidator {
+class CognitoMigrationUserStorageProvider implements UserStorageProvider implements UserLookupProvider implements CredentialInputValidator {
 	
 	final session:KeycloakSession;
 	final model:ComponentModel;

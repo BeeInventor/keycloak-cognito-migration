@@ -14,7 +14,7 @@ import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.storage.UserStorageProvider;
 import org.keycloak.storage.UserStorageProviderFactory;
 
-class CognitoUserStorageProviderFactory implements UserStorageProviderFactory<CognitoUserStorageProvider> {
+class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderFactory<CognitoMigrationUserStorageProvider> {
 	
 	public static inline final AWS_ACCESS_KEY_ID = 'aws-access-key-id';
 	public static inline final AWS_SECRET_ACCESS_KEY = 'aws-secret-access-key';
@@ -97,8 +97,11 @@ class CognitoUserStorageProviderFactory implements UserStorageProviderFactory<Co
 		
 		inline function ensure(name:String) {
 			switch config.getFirst(name) {
-				case null | '': throw new ComponentValidationException('Missing config: $name');
-				case _: // ok
+				case null | '':
+					// WORKAROUND: the second param is for https://github.com/HaxeFoundation/haxe/issues/10380
+					throw new ComponentValidationException('Missing Configuration: $name', name);
+				case _:
+					// ok
 			}
 		}
 		
@@ -122,7 +125,7 @@ class CognitoUserStorageProviderFactory implements UserStorageProviderFactory<Co
 		return null;
 	}
 
-	public overload function create(session:KeycloakSession, model:ComponentModel):CognitoUserStorageProvider {
+	public overload function create(session:KeycloakSession, model:ComponentModel):CognitoMigrationUserStorageProvider {
 		final validator = new Validator({
 			accessKeyId: model.getConfig().getFirst(AWS_ACCESS_KEY_ID),
 			secretAccessKey: model.getConfig().getFirst(AWS_SECRET_ACCESS_KEY),
@@ -131,11 +134,11 @@ class CognitoUserStorageProviderFactory implements UserStorageProviderFactory<Co
 			clientId: model.getConfig().getFirst(COGNITO_CLIENT_ID),
 			clientSecret: model.getConfig().getFirst(COGNITO_CLIENT_SECRET),
 		});
-		return new CognitoUserStorageProvider(session, model, validator);
+		return new CognitoMigrationUserStorageProvider(session, model, validator);
 	}
 
 	public function getId():String {
-		return 'cognito-user-migration-user-storage';
+		return 'cognito-migration';
 	}
 
 	public function init(config:Config_Scope) {}

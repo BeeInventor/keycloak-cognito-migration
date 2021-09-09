@@ -2,8 +2,8 @@
 --jvm bin/Main.jar
 --dce full
 
-com.beeinventor.keycloak.CognitoUserStorageProvider
-com.beeinventor.keycloak.CognitoUserStorageProviderFactory
+com.beeinventor.keycloak.CognitoMigrationUserStorageProvider
+com.beeinventor.keycloak.CognitoMigrationUserStorageProviderFactory
 
 --java-lib-extern extern/javax-crypto.jar
 

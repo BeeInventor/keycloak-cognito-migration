@@ -1,1 +1,1 @@
-com.beeinventor.keycloak.CognitoUserStorageProviderFactory
+com.beeinventor.keycloak.CognitoMigrationUserStorageProviderFactory

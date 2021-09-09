@@ -6,12 +6,12 @@
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
 		<group.id>com.beeinventor</group.id>
-		<artifact.id>keycloak-cognito-user-storage</artifact.id>
+		<artifact.id>keycloak-cognito-migration</artifact.id>
 		<version>1.0</version>
 	</properties>
 
 	<groupId>com.beeinventor</groupId>
-	<artifactId>keycloak-cognito-user-storage</artifactId>
+	<artifactId>keycloak-cognito-migration</artifactId>
 	<packaging>jar</packaging>
 	<version>1.0</version>
 
