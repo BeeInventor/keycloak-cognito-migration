@@ -1,5 +1,6 @@
 package com.beeinventor.keycloak;
 
+import java.util.Collections;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.credential.CredentialInput;
@@ -53,11 +54,14 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 		return switch validator.validate(username, password) {
 			case null:
 				false;
-			case remote:
+			case {id: cognitoId, emailVerified: emailVerified, attributes: attributes}:
 				session.userCredentialManager().updateCredential(realm, user, input);
-				user.setEmailVerified(true);
-				user.setFederationLink(null);
 				user.setEnabled(true);
+				user.setEmailVerified(emailVerified);
+				user.setAttribute('cognito_id', Collections.singletonList(cognitoId));
+				for(key => value in attributes)
+					user.setAttribute('cognito_$key', Collections.singletonList(value));
+				user.setFederationLink(null);
 				true;
 		}
 	}
