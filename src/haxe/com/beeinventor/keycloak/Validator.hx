@@ -47,24 +47,18 @@ class Validator {
 			
 			// get the user and return its id
 			final result = get(username);
+			final attributes = [
+				'username' => result.getUsername(),
+				'user_create_date' => formatDate(result.getUserCreateDate()),
+				'user_last_modified_date' => formatDate(result.getUserLastModifiedDate()),
+				'user_status' => result.getUserStatus(),
+				'preferred_mfa_setting' => result.getPreferredMfaSetting(),
+			];
 			
-			var id = result.getUsername(); 
-			var emailVerified = false;
-			final attributes = new Map();
-			
-			for(attr in result.getUserAttributes()) {
-				final value = attr.getValue();
-				switch attr.getName() {
-					case 'sub':
-						id = value;
-					case 'email_verified':
-						emailVerified = value == 'true';
-					case key:
-						attributes[key] = value;
-				}
-			}
+			for(attr in result.getUserAttributes()) 
+				attributes[attr.getName()] = attr.getValue();
 				
-			{id: id, emailVerified: emailVerified, attributes: attributes}
+			attributes;
 			
 		} catch (ex) {
 			null;
@@ -96,5 +90,11 @@ class Validator {
 					params;
 				});
 		});
+	}
+	
+	function formatDate(date:java.util.Date) {
+		final format = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'");
+		format.setTimeZone(java.util.TimeZone.getTimeZone('UTC'));
+		return format.format(date);
 	}
 }

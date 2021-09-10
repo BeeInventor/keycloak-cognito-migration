@@ -54,11 +54,10 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 		return switch validator.validate(username, password) {
 			case null:
 				false;
-			case {id: cognitoId, emailVerified: emailVerified, attributes: attributes}:
+			case attributes:
 				session.userCredentialManager().updateCredential(realm, user, input);
 				user.setEnabled(true);
-				user.setEmailVerified(emailVerified);
-				user.setAttribute('cognito_id', Collections.singletonList(cognitoId));
+				user.setEmailVerified(attributes['email_verified'] == 'true');
 				for(key => value in attributes)
 					user.setAttribute('cognito_$key', Collections.singletonList(value));
 				user.setFederationLink(null);
