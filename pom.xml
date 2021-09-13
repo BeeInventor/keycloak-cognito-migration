@@ -1,19 +1,40 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-
 	<properties>
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
 		<group.id>com.beeinventor</group.id>
 		<artifact.id>keycloak-cognito-migration</artifact.id>
-		<version>1.0</version>
+		<github.global.server>github</github.global.server>
 	</properties>
 
 	<groupId>com.beeinventor</groupId>
 	<artifactId>keycloak-cognito-migration</artifactId>
 	<packaging>jar</packaging>
-	<version>1.0</version>
+	<version>1.0.0</version>
+	<scm>
+		<url>https://github.com/BeeInventor/keycloak-cognito-migration</url>
+	</scm>
+
+	<repositories>
+		<repository>
+			<id>haxe-maven-plugin-mvn-repo</id>
+			<url>https://raw.githubusercontent.com/kevinresol/haxe-maven-plugin/mvn-repo/</url>
+			<snapshots>
+				<enabled>true</enabled>
+				<updatePolicy>always</updatePolicy>
+			</snapshots>
+		</repository>
+	</repositories>
+	
+	<distributionManagement>
+		<repository>
+		  <id>internal.repo</id>
+		  <name>Temporary Staging Repository</name>
+		  <url>file://${project.build.directory}/mvn-repo</url>
+		</repository>
+	  </distributionManagement>	
 
 	<dependencies>
 		<dependency>
@@ -68,7 +89,7 @@
 			<plugin>
 				<groupId>com.kevinresol</groupId>
 				<artifactId>haxe-maven-plugin</artifactId>
-				<version>1.0-SNAPSHOT</version>
+				<version>1.0.0</version>
 				<!-- <configuration>
 					<hxml>./build.hxml</hxml>
 					<args>
@@ -97,6 +118,38 @@
 						</manifest>
 					</archive>
 				</configuration>
+			</plugin>
+			<plugin>
+				<artifactId>maven-deploy-plugin</artifactId>
+				<version>2.8.2</version>
+				<configuration>
+					<altDeploymentRepository>internal.repo::default::file://${project.build.directory}/mvn-repo</altDeploymentRepository>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>com.github.github</groupId>
+				<artifactId>site-maven-plugin</artifactId>
+				<version>0.12</version>
+				<configuration>
+					<message>Maven artifacts for ${project.version}</message>
+					<branch>refs/heads/mvn-repo</branch>
+					<noJekyll>true</noJekyll>
+					<outputDirectory>${project.build.directory}/mvn-repo</outputDirectory>
+					<includes>
+						<include>**/*</include>
+					</includes>
+					<merge>true</merge>
+					<repositoryOwner>BeeInventor</repositoryOwner>
+					<repositoryName>keycloak-cognito-migration</repositoryName>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>site</goal>
+						</goals>
+						<phase>deploy</phase>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>
