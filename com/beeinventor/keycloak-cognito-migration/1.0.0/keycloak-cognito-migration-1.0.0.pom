@@ -12,7 +12,7 @@
 	<groupId>com.beeinventor</groupId>
 	<artifactId>keycloak-cognito-migration</artifactId>
 	<packaging>jar</packaging>
-	<version>1.0</version>
+	<version>1.0.0</version>
 	<scm>
 		<url>https://github.com/BeeInventor/keycloak-cognito-migration</url>
 	</scm>
