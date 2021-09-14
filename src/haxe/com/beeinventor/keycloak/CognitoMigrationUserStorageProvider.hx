@@ -55,6 +55,8 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 			case null:
 				false;
 			case attributes:
+				// TODO: old password may not comply with current password policies
+				// need to find a way to bypass password policies, or force user to change password
 				session.userCredentialManager().updateCredential(realm, user, input);
 				user.setEnabled(true);
 				user.setEmailVerified(attributes['email_verified'] == 'true');

@@ -18,6 +18,12 @@ When an user attempts to login:
 1. Insert the required configurations and save.
 1. Done. From now on, any password login will perform the logic in the Description section above.
 
+## Canveat
+
+When creating the user and setting its password in keycloak local database, the realm's password policies will apply.
+That means if the user's old password in Cognito does not comply with the policies, the migration will fail.
+So make sure your realm's policies match those in your Cognito user pool.
+
 ## Development
 
 1. Start the devcontainer
