@@ -1,5 +1,6 @@
 package com.beeinventor.keycloak;
 
+import java.lang.Throwable;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
@@ -36,6 +37,10 @@ class Validator {
 			final result = get(username);
 			result.getEnabled();
 		} catch (ex) {
+			switch Std.downcast(cast ex, Throwable) {
+				case null: // skip
+				case e: e.printStackTrace();
+			}
 			false;
 		}
 	}
@@ -61,6 +66,10 @@ class Validator {
 			attributes;
 			
 		} catch (ex) {
+			switch Std.downcast(cast ex, Throwable) {
+				case null: // skip
+				case e: e.printStackTrace();
+			}
 			null;
 		}
 	}
