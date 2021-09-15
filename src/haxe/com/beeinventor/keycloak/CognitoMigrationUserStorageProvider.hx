@@ -1,12 +1,18 @@
 package com.beeinventor.keycloak;
 
+import haxe.DynamicAccess;
+import haxe.io.Bytes;
+import haxe.io.BytesBuffer;
+import haxe.Json;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Collections;
 import org.keycloak.component.ComponentModel;
-import org.keycloak.models.KeycloakSession;
 import org.keycloak.credential.CredentialInput;
 import org.keycloak.credential.CredentialInputValidator;
 import org.keycloak.models.credential.PasswordCredentialModel;
 import org.keycloak.models.GroupModel;
+import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserModel;
@@ -18,11 +24,13 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 	final session:KeycloakSession;
 	final model:ComponentModel;
 	final validator:Validator;
+	final webhooks:Webhooks;
 	
-	public function new(session, model, validator) {
+	public function new(session, model, validator, webhooks) {
 		this.session = session;
 		this.model = model;
 		this.validator = validator;
+		this.webhooks = webhooks;
 	}
 
 	public function close() {
@@ -63,6 +71,20 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 				for(key => value in attributes)
 					user.setAttribute('cognito_$key', Collections.singletonList(value));
 				user.setFederationLink(null);
+				switch webhooks.onSuccess {
+					case null | '': // skip
+					case url: 
+						final result = invokeWebhook(url, 'POST', {
+							id: user.getId(),
+							attributes: {
+								final attr = new DynamicAccess();
+								for(key => value in attributes)
+									attr['cognito_$key'] = value;
+								attr;
+							}
+						});
+						trace('webhook result: ${result.status} ${result.body.toString()}');
+				}
 				true;
 		}
 	}
@@ -106,4 +128,37 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 	public overload function getUserByUsername(username:String, realm:RealmModel):UserModel {
 		return getUserByUsername(realm, username);
 	}
+	
+	function invokeWebhook(url:String, method:String, payload:WebhookPayload) {
+		final url = new URL(url);
+		final cnx:HttpURLConnection = cast url.openConnection();
+		final data = Bytes.ofString(Json.stringify(payload));
+		
+		cnx.setRequestMethod('POST');
+		cnx.setRequestProperty('Content-Type', 'application/json');
+		cnx.setDoOutput(true);
+		
+		final out = cnx.getOutputStream();
+		out.write(data.getData());
+		out.flush();
+		out.close();
+		
+		return {
+			status: cnx.getResponseCode(),
+			body: {
+				final body = cnx.getInputStream();
+				final buffer = new BytesBuffer();
+				while(true) switch body.read() {
+					case -1: break; 
+					case v: buffer.addByte(v);
+				}
+				buffer.getBytes();
+			}
+		}
+	}
+}
+
+typedef WebhookPayload = {
+	final id:String;
+	final attributes:Dynamic<String>;
 }

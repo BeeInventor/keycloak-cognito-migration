@@ -1,11 +1,9 @@
 package com.beeinventor.keycloak;
 
-import java.util.Arrays;
-import java.util.Collections;
-import org.keycloak.storage.UserStorageProviderSpi;
-import org.keycloak.component.ComponentValidationException;
 import java.util.ArrayList;
+import java.util.Collections;
 import org.keycloak.component.ComponentModel;
+import org.keycloak.component.ComponentValidationException;
 import org.keycloak.Config;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
@@ -13,6 +11,7 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.storage.UserStorageProvider;
 import org.keycloak.storage.UserStorageProviderFactory;
+import org.keycloak.storage.UserStorageProviderSpi;
 
 class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderFactory<CognitoMigrationUserStorageProvider> {
 	
@@ -22,6 +21,7 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 	public static inline final COGNITO_USER_POOL_ID = 'cognito-user-pool-id';
 	public static inline final COGNITO_CLIENT_ID = 'cognito-client-id';
 	public static inline final COGNITO_CLIENT_SECRET = 'cognito-client-secret';
+	public static inline final WEBHOOK_SUCCESS = 'webhook-success';
 	
 	public function new() {}
 	
@@ -89,6 +89,15 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 			secret: true,
 		});
 		
+		add({
+			name: WEBHOOK_SUCCESS,
+			label: 'Webhook (On Success Migration)',
+			helpText: 'Optional. ',
+			type: ProviderConfigProperty.STRING_TYPE,
+			defaultValue: '',
+			secret: true,
+		});
+		
 		return list;
 	}
 	
@@ -116,6 +125,10 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 		return 'Migrate Cognito Users';
 	}
 
+	public function getId():String {
+		return 'cognito-migration';
+	}
+
 	public function close() {}
 
 	public overload function create(session:KeycloakSession):UserStorageProvider {
@@ -134,11 +147,10 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 			clientId: model.getConfig().getFirst(COGNITO_CLIENT_ID),
 			clientSecret: model.getConfig().getFirst(COGNITO_CLIENT_SECRET),
 		});
-		return new CognitoMigrationUserStorageProvider(session, model, validator);
-	}
-
-	public function getId():String {
-		return 'cognito-migration';
+		final webhooks:Webhooks = {
+			onSuccess: model.getConfig().getFirst(WEBHOOK_SUCCESS),
+		}
+		return new CognitoMigrationUserStorageProvider(session, model, validator, webhooks);
 	}
 
 	public function init(config:Config_Scope) {}
