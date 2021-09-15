@@ -21,6 +21,7 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 	public static inline final COGNITO_USER_POOL_ID = 'cognito-user-pool-id';
 	public static inline final COGNITO_CLIENT_ID = 'cognito-client-id';
 	public static inline final COGNITO_CLIENT_SECRET = 'cognito-client-secret';
+	public static inline final WEBHOOK_AUTH_HEADER = 'webhook-auth-header';
 	public static inline final WEBHOOK_SUCCESS = 'webhook-success';
 	
 	public function new() {}
@@ -90,12 +91,21 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 		});
 		
 		add({
+			name: WEBHOOK_AUTH_HEADER,
+			label: 'Webhook Authorization Header',
+			helpText: 'Optional. Example: "Bearer MyToken"',
+			type: ProviderConfigProperty.STRING_TYPE,
+			defaultValue: '',
+			secret: true,
+		});
+		
+		add({
 			name: WEBHOOK_SUCCESS,
 			label: 'Webhook (On Success Migration)',
 			helpText: 'Optional. ',
 			type: ProviderConfigProperty.STRING_TYPE,
 			defaultValue: '',
-			secret: true,
+			secret: false,
 		});
 		
 		return list;
@@ -148,6 +158,7 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 			clientSecret: model.getConfig().getFirst(COGNITO_CLIENT_SECRET),
 		});
 		final webhooks:Webhooks = {
+			auth: model.getConfig().getFirst(WEBHOOK_AUTH_HEADER),
 			onSuccess: model.getConfig().getFirst(WEBHOOK_SUCCESS),
 		}
 		return new CognitoMigrationUserStorageProvider(session, model, validator, webhooks);

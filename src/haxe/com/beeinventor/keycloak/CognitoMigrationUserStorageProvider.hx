@@ -20,12 +20,11 @@ import org.keycloak.storage.user.UserLookupProvider;
 import org.keycloak.storage.UserStorageProvider;
 
 class CognitoMigrationUserStorageProvider implements UserStorageProvider implements UserLookupProvider implements CredentialInputValidator {
-	
 	final session:KeycloakSession;
 	final model:ComponentModel;
 	final validator:Validator;
 	final webhooks:Webhooks;
-	
+
 	public function new(session, model, validator, webhooks) {
 		this.session = session;
 		this.model = model;
@@ -54,11 +53,12 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 	}
 
 	public function isValid(realm:RealmModel, user:UserModel, input:CredentialInput):Bool {
-		if(!supportsCredentialType(input.getType())) return false;
-		
+		if (!supportsCredentialType(input.getType()))
+			return false;
+
 		final username = user.getUsername();
 		final password = input.getChallengeResponse();
-		
+
 		return switch validator.validate(username, password) {
 			case null:
 				false;
@@ -68,17 +68,24 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 				session.userCredentialManager().updateCredential(realm, user, input);
 				user.setEnabled(true);
 				user.setEmailVerified(attributes['email_verified'] == 'true');
-				for(key => value in attributes)
+				for (key => value in attributes)
 					user.setAttribute('cognito_$key', Collections.singletonList(value));
 				user.setFederationLink(null);
 				switch webhooks.onSuccess {
 					case null | '': // skip
-					case url: 
+					case url:
 						final result = invokeWebhook(url, 'POST', {
+							final headers = [];
+							switch webhooks.auth {
+								case null | '': // skip
+								case v: headers.push({name: 'Authorization', value: v});
+							}
+							headers;
+						}, {
 							id: user.getId(),
 							attributes: {
 								final attr = new DynamicAccess();
-								for(key => value in attributes)
+								for (key => value in attributes)
 									attr['cognito_$key'] = value;
 								attr;
 							}
@@ -94,7 +101,7 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 	}
 
 	public overload function getUserByEmail(realm:RealmModel, email:String):UserModel {
-		return if(validator.exists(email)) {
+		return if (validator.exists(email)) {
 			switch session.userLocalStorage().getUserByEmail(realm, email) {
 				case null:
 					final user = session.userLocalStorage().addUser(realm, email);
@@ -128,34 +135,42 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 	public overload function getUserByUsername(username:String, realm:RealmModel):UserModel {
 		return getUserByUsername(realm, username);
 	}
-	
-	function invokeWebhook(url:String, method:String, payload:WebhookPayload) {
+
+	function invokeWebhook(url:String, method:String, headers:Array<WebhookHeader>, payload:WebhookPayload) {
 		final url = new URL(url);
 		final cnx:HttpURLConnection = cast url.openConnection();
 		final data = Bytes.ofString(Json.stringify(payload));
-		
+
 		cnx.setRequestMethod('POST');
 		cnx.setRequestProperty('Content-Type', 'application/json');
+		for(header in headers)
+			cnx.setRequestProperty(header.name, header.value);
 		cnx.setDoOutput(true);
-		
+
 		final out = cnx.getOutputStream();
 		out.write(data.getData());
 		out.flush();
 		out.close();
-		
+
 		return {
 			status: cnx.getResponseCode(),
 			body: {
 				final body = cnx.getInputStream();
 				final buffer = new BytesBuffer();
-				while(true) switch body.read() {
-					case -1: break; 
-					case v: buffer.addByte(v);
-				}
+				while (true)
+					switch body.read() {
+						case -1: break;
+						case v: buffer.addByte(v);
+					}
 				buffer.getBytes();
 			}
 		}
 	}
+}
+
+typedef WebhookHeader = {
+	final name:String;
+	final value:String;
 }
 
 typedef WebhookPayload = {
