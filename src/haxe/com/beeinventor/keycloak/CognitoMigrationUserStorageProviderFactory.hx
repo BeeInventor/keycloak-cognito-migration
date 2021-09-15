@@ -1,5 +1,6 @@
 package com.beeinventor.keycloak;
 
+import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import org.keycloak.component.ComponentModel;
@@ -9,11 +10,12 @@ import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
 import org.keycloak.models.RealmModel;
 import org.keycloak.provider.ProviderConfigProperty;
+import org.keycloak.provider.ServerInfoAwareProviderFactory;
 import org.keycloak.storage.UserStorageProvider;
 import org.keycloak.storage.UserStorageProviderFactory;
 import org.keycloak.storage.UserStorageProviderSpi;
 
-class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderFactory<CognitoMigrationUserStorageProvider> {
+class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderFactory<CognitoMigrationUserStorageProvider> implements ServerInfoAwareProviderFactory {
 	
 	public static inline final AWS_ACCESS_KEY_ID = 'aws-access-key-id';
 	public static inline final AWS_SECRET_ACCESS_KEY = 'aws-secret-access-key';
@@ -188,4 +190,13 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 	public function onUpdate(session:KeycloakSession, realm:RealmModel, oldModel:ComponentModel, newModel:ComponentModel) {}
 
 	public function preRemove(session:KeycloakSession, realm:RealmModel, model:ComponentModel) {}
+
+	public function getOperationalInfo():java.util.Map<String, String> {
+		// These info will be shown in the Server Info page in admin console
+		final info = new HashMap();
+		final pom = Macro.readPomInfo();
+		info.put('version', pom.version);
+		info.put('website', pom.website);
+		return info;
+	}
 }
