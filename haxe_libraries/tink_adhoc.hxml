@@ -1,0 +1,4 @@
+# @install: lix --silent download "gh://github.com/haxetink/tink_adhoc#9f4f7a01a50b64041ca554902f1f3d43dffe661a" into tink_adhoc/0.0.0/github/9f4f7a01a50b64041ca554902f1f3d43dffe661a
+-lib tink_macro
+-cp ${HAXE_LIBCACHE}/tink_adhoc/0.0.0/github/9f4f7a01a50b64041ca554902f1f3d43dffe661a/src
+-D tink_adhoc=0.0.0

@@ -1,11 +1,6 @@
 package com.beeinventor.keycloak;
 
 import haxe.DynamicAccess;
-import haxe.io.Bytes;
-import haxe.io.BytesBuffer;
-import haxe.Json;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.Collections;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.credential.CredentialInput;
@@ -22,13 +17,13 @@ import org.keycloak.storage.UserStorageProvider;
 class CognitoMigrationUserStorageProvider implements UserStorageProvider implements UserLookupProvider implements CredentialInputValidator {
 	final session:KeycloakSession;
 	final model:ComponentModel;
-	final validator:Validator;
+	final cognito:Cognito;
 	final webhooks:Webhooks;
 
-	public function new(session, model, validator, webhooks) {
+	public function new(session, model, cognito, webhooks) {
 		this.session = session;
 		this.model = model;
-		this.validator = validator;
+		this.cognito = cognito;
 		this.webhooks = webhooks;
 	}
 
@@ -59,7 +54,7 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 		final username = user.getUsername();
 		final password = input.getChallengeResponse();
 
-		return switch validator.validate(username, password) {
+		return switch cognito.validate(username, password) {
 			case null:
 				false;
 			case attributes:
@@ -71,10 +66,12 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 				for (key => value in attributes)
 					user.setAttribute('cognito_$key', Collections.singletonList(value));
 				user.setFederationLink(null);
-				switch webhooks.onSuccess {
-					case null | '': // skip
-					case url:
-						final result = invokeWebhook(url, 'POST', {
+				
+				// invoke webhook
+				switch webhooks.onCredentialsMigrated {
+					case null: // skip
+					case webhook:
+						final result = webhook.invoke('POST', {
 							final headers = [];
 							switch webhooks.auth {
 								case null | '': // skip
@@ -90,7 +87,6 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 								attr;
 							}
 						});
-						trace('webhook result: ${result.status} ${result.body.toString()}');
 				}
 				true;
 		}
@@ -101,7 +97,7 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 	}
 
 	public overload function getUserByEmail(realm:RealmModel, email:String):UserModel {
-		return if (validator.exists(email)) {
+		return if (cognito.exists(email)) {
 			switch session.userLocalStorage().getUserByEmail(realm, email) {
 				case null:
 					final user = session.userLocalStorage().addUser(realm, email);
@@ -135,45 +131,4 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 	public overload function getUserByUsername(username:String, realm:RealmModel):UserModel {
 		return getUserByUsername(realm, username);
 	}
-
-	function invokeWebhook(url:String, method:String, headers:Array<WebhookHeader>, payload:WebhookPayload) {
-		final url = new URL(url);
-		final cnx:HttpURLConnection = cast url.openConnection();
-		final data = Bytes.ofString(Json.stringify(payload));
-
-		cnx.setRequestMethod('POST');
-		cnx.setRequestProperty('Content-Type', 'application/json');
-		for(header in headers)
-			cnx.setRequestProperty(header.name, header.value);
-		cnx.setDoOutput(true);
-
-		final out = cnx.getOutputStream();
-		out.write(data.getData());
-		out.flush();
-		out.close();
-
-		return {
-			status: cnx.getResponseCode(),
-			body: {
-				final body = cnx.getInputStream();
-				final buffer = new BytesBuffer();
-				while (true)
-					switch body.read() {
-						case -1: break;
-						case v: buffer.addByte(v);
-					}
-				buffer.getBytes();
-			}
-		}
-	}
-}
-
-typedef WebhookHeader = {
-	final name:String;
-	final value:String;
-}
-
-typedef WebhookPayload = {
-	final id:String;
-	final attributes:Dynamic<String>;
 }

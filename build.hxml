@@ -5,6 +5,7 @@
 com.beeinventor.keycloak.CognitoMigrationUserStorageProvider
 com.beeinventor.keycloak.CognitoMigrationUserStorageProviderFactory
 
+--library tink_adhoc
 --java-lib-extern extern/javax-crypto.jar
 
 maven.hxml

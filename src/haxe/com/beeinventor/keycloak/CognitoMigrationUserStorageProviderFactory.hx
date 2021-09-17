@@ -1,22 +1,31 @@
 package com.beeinventor.keycloak;
 
-import java.util.HashMap;
+import haxe.DynamicAccess;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.component.ComponentValidationException;
 import org.keycloak.Config;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.KeycloakSessionFactory;
+import org.keycloak.models.KeycloakSessionTask;
 import org.keycloak.models.RealmModel;
+import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.provider.ProviderConfigProperty;
 import org.keycloak.provider.ServerInfoAwareProviderFactory;
+import org.keycloak.storage.user.ImportSynchronization;
+import org.keycloak.storage.user.SynchronizationResult;
 import org.keycloak.storage.UserStorageProvider;
 import org.keycloak.storage.UserStorageProviderFactory;
+import org.keycloak.storage.UserStorageProviderModel;
 import org.keycloak.storage.UserStorageProviderSpi;
+import sys.thread.Lock;
+import sys.thread.Thread;
+import tink.Adhoc;
 
-class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderFactory<CognitoMigrationUserStorageProvider> implements ServerInfoAwareProviderFactory {
-	
+class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderFactory<CognitoMigrationUserStorageProvider>
+		implements ServerInfoAwareProviderFactory implements ImportSynchronization {
 	public static inline final AWS_ACCESS_KEY_ID = 'aws-access-key-id';
 	public static inline final AWS_SECRET_ACCESS_KEY = 'aws-secret-access-key';
 	public static inline final AWS_REGION = 'aws-region';
@@ -24,20 +33,22 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 	public static inline final COGNITO_CLIENT_ID = 'cognito-client-id';
 	public static inline final COGNITO_CLIENT_SECRET = 'cognito-client-secret';
 	public static inline final WEBHOOK_AUTH_HEADER = 'webhook-auth-header';
-	public static inline final WEBHOOK_SUCCESS = 'webhook-success';
-	
+	public static inline final WEBHOOK_ON_ACCOUNT_CREATED = 'webhook-on-account-created';
+	public static inline final WEBHOOK_ON_CREDENTIALS_MIGRATED = 'webhook-on-credentials-migrated';
+	public static inline final WEBHOOK_BATCH_SIZE = 200;
+
 	public function new() {}
-	
+
 	public function getConfigProperties():java.util.List<ProviderConfigProperty> {
-		
 		final list = new ArrayList();
-		
+
 		inline function add(o, ?postprocess) {
 			final property = new ProviderConfigProperty(o.name, o.label, o.helpText, o.type, o.defaultValue, o.secret);
-			if(postprocess != null) postprocess(property);
+			if (postprocess != null)
+				postprocess(property);
 			return list.add(property);
 		}
-		
+
 		add({
 			name: AWS_ACCESS_KEY_ID,
 			label: 'AWS Access Key ID',
@@ -46,7 +57,7 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 			defaultValue: '',
 			secret: false,
 		});
-		
+
 		add({
 			name: AWS_SECRET_ACCESS_KEY,
 			label: 'AWS Secret Access Key',
@@ -55,7 +66,7 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 			defaultValue: '',
 			secret: true,
 		});
-		
+
 		add({
 			name: AWS_REGION,
 			label: 'AWS Region',
@@ -64,7 +75,7 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 			defaultValue: '',
 			secret: false,
 		});
-		
+
 		add({
 			name: COGNITO_USER_POOL_ID,
 			label: 'Cognito User Pool ID',
@@ -73,7 +84,7 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 			defaultValue: '',
 			secret: false,
 		});
-		
+
 		add({
 			name: COGNITO_CLIENT_ID,
 			label: 'Cognito Client ID',
@@ -82,7 +93,7 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 			defaultValue: '',
 			secret: false,
 		});
-		
+
 		add({
 			name: COGNITO_CLIENT_SECRET,
 			label: 'Cognito Client Secret',
@@ -91,7 +102,7 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 			defaultValue: '',
 			secret: true,
 		});
-		
+
 		add({
 			name: WEBHOOK_AUTH_HEADER,
 			label: 'Webhook Authorization Header',
@@ -100,22 +111,31 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 			defaultValue: '',
 			secret: true,
 		});
-		
+
 		add({
-			name: WEBHOOK_SUCCESS,
-			label: 'Webhook (On Success Migration)',
+			name: WEBHOOK_ON_ACCOUNT_CREATED,
+			label: 'Webhook (On Account Created)',
 			helpText: 'Optional. ',
 			type: ProviderConfigProperty.STRING_TYPE,
 			defaultValue: '',
 			secret: false,
 		});
-		
+
+		add({
+			name: WEBHOOK_ON_CREDENTIALS_MIGRATED,
+			label: 'Webhook (On Credentials Migrated)',
+			helpText: 'Optional. ',
+			type: ProviderConfigProperty.STRING_TYPE,
+			defaultValue: '',
+			secret: false,
+		});
+
 		return list;
 	}
-	
+
 	public function validateConfiguration(session:KeycloakSession, realm:RealmModel, model:ComponentModel) {
 		final config = model.getConfig();
-		
+
 		inline function ensure(name:String) {
 			switch config.getFirst(name) {
 				case null | '':
@@ -125,7 +145,7 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 					// ok
 			}
 		}
-		
+
 		ensure(AWS_ACCESS_KEY_ID);
 		ensure(AWS_SECRET_ACCESS_KEY);
 		ensure(AWS_REGION);
@@ -144,33 +164,21 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 	public function close() {}
 
 	public overload function create(session:KeycloakSession):UserStorageProvider {
-		// default method: 
+		// default method:
 		// https://github.com/keycloak/keycloak/blob/cd342ad5714f15db1cc8b0cd55b788e6543c6dc8/server-spi/src/main/java/org/keycloak/component/ComponentFactory.java#L39
 		// haxe bug tracker: https://github.com/HaxeFoundation/haxe/issues/10328
 		return null;
 	}
 
 	public overload function create(session:KeycloakSession, model:ComponentModel):CognitoMigrationUserStorageProvider {
-		final validator = new Validator({
-			accessKeyId: model.getConfig().getFirst(AWS_ACCESS_KEY_ID),
-			secretAccessKey: model.getConfig().getFirst(AWS_SECRET_ACCESS_KEY),
-			region: model.getConfig().getFirst(AWS_REGION),
-			userPoolId: model.getConfig().getFirst(COGNITO_USER_POOL_ID),
-			clientId: model.getConfig().getFirst(COGNITO_CLIENT_ID),
-			clientSecret: model.getConfig().getFirst(COGNITO_CLIENT_SECRET),
-		});
-		final webhooks:Webhooks = {
-			auth: model.getConfig().getFirst(WEBHOOK_AUTH_HEADER),
-			onSuccess: model.getConfig().getFirst(WEBHOOK_SUCCESS),
-		}
-		return new CognitoMigrationUserStorageProvider(session, model, validator, webhooks);
+		return new CognitoMigrationUserStorageProvider(session, model, getCognito(model), getWebhooks(model));
 	}
-
-	public function init(config:Config_Scope) {}
 
 	public function order():Int {
 		return 0;
 	}
+
+	public function init(config:Config_Scope) {}
 
 	public function postInit(param1:KeycloakSessionFactory) {}
 
@@ -182,7 +190,13 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 	}
 
 	public function getTypeMetadata():java.util.Map<String, Dynamic> {
-		return Collections.emptyMap();
+		// default method:
+		// https://github.com/keycloak/keycloak/blob/cd342ad5714f15db1cc8b0cd55b788e6543c6dc8/server-spi/src/main/java/org/keycloak/storage/UserStorageProviderFactory.java#L115-L120
+		// haxe bug tracker: https://github.com/HaxeFoundation/haxe/issues/10328
+		final metadata = new HashMap();
+		if (Std.isOfType(this, ImportSynchronization))
+			metadata.put("synchronizable", true);
+		return metadata;
 	}
 
 	public function onCreate(session:KeycloakSession, realm:RealmModel, model:ComponentModel) {}
@@ -198,5 +212,102 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 		info.put('version', pom.version);
 		info.put('website', pom.website);
 		return info;
+	}
+
+	public function sync(sessionFactory:KeycloakSessionFactory, realmId:String, model:UserStorageProviderModel):SynchronizationResult {
+		final cognito = getCognito(model);
+		final webhooks = getWebhooks(model);
+		final result = new SynchronizationResult();
+
+		KeycloakModelUtils.runJobInTransaction(sessionFactory, new Adhoc<KeycloakSessionTask>(null, {
+			run: (_, session:KeycloakSession) -> {
+				final realm = session.realms().getRealm(realmId);
+				final localStorage = session.userLocalStorage();
+				final remoteUsers = cognito.list();
+				final webhookPayloads:Array<Webhooks.UserPayload> = [];
+
+				for (remote in remoteUsers) {
+					final attributes = [for (attr in remote.getAttributes()) attr.getName() => attr.getValue()];
+					if (localStorage.searchForUserByUserAttributeStream(realm, 'cognito_sub', attributes['sub']).count() == 0) {
+						result.increaseAdded();
+						final username = remote.getUsername();
+						final local = localStorage.addUser(realm, username);
+						switch attributes['email'] {
+							case null: // skip
+							case email: local.setEmail(email);
+						}
+
+						for (key => value in attributes)
+							local.setAttribute('cognito_$key', Collections.singletonList(value));
+
+						local.setFederationLink(model.getId());
+
+						// webhook
+						webhookPayloads.push({
+							id: local.getId(),
+							attributes: {
+								final attr = new DynamicAccess();
+								for (key => value in attributes)
+									attr['cognito_$key'] = value;
+								attr;
+							}
+						});
+					}
+				}
+
+				// run webhooks in parallel
+				final lock = new Lock();
+				final batches = Math.ceil(webhookPayloads.length / WEBHOOK_BATCH_SIZE);
+				for (i in 0...batches) {
+					final payloads = webhookPayloads.slice(i * WEBHOOK_BATCH_SIZE, (i+1) * WEBHOOK_BATCH_SIZE);
+					Thread.create(() -> {
+						// invoke webhook
+						switch webhooks.onAccountCreated {
+							case null: // skip
+							case webhook:
+								final result = webhook.invoke('POST', {
+									final headers = [];
+									switch webhooks.auth {
+										case null | '': // skip
+										case v: headers.push({name: 'Authorization', value: v});
+									}
+									headers;
+								}, payloads);
+						}
+
+						lock.release();
+					});
+				}
+
+				for (_ in 0...batches)
+					lock.wait();
+			}
+		}));
+
+		return result;
+	}
+
+	public function syncSince(lastSync:java.util.Date, sessionFactory:KeycloakSessionFactory, realmId:String,
+			model:UserStorageProviderModel):SynchronizationResult {
+		return sync(sessionFactory, realmId, model);
+	}
+
+	static function getCognito(model:ComponentModel) {
+		return new Cognito({
+			accessKeyId: model.getConfig().getFirst(AWS_ACCESS_KEY_ID),
+			secretAccessKey: model.getConfig().getFirst(AWS_SECRET_ACCESS_KEY),
+			region: model.getConfig().getFirst(AWS_REGION),
+			userPoolId: model.getConfig().getFirst(COGNITO_USER_POOL_ID),
+			clientId: model.getConfig().getFirst(COGNITO_CLIENT_ID),
+			clientSecret: model.getConfig().getFirst(COGNITO_CLIENT_SECRET),
+		});
+	}
+
+	static function getWebhooks(model:ComponentModel):Webhooks {
+		return {
+			auth: model.getConfig().getFirst(WEBHOOK_AUTH_HEADER),
+			onAccountCreated: new Webhooks.Webhook(model.getConfig().getFirst(WEBHOOK_ON_ACCOUNT_CREATED)),
+			onCredentialsMigrated: new Webhooks.Webhook(model.getConfig().getFirst(WEBHOOK_ON_CREDENTIALS_MIGRATED)),
+		}
 	}
 }

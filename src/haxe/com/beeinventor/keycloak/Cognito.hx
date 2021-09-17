@@ -1,6 +1,5 @@
 package com.beeinventor.keycloak;
 
-import java.lang.Throwable;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProvider;
@@ -8,9 +7,12 @@ import com.amazonaws.services.cognitoidp.AWSCognitoIdentityProviderClientBuilder
 import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminInitiateAuthRequest;
 import com.amazonaws.services.cognitoidp.model.AuthFlowType;
+import com.amazonaws.services.cognitoidp.model.ListUsersRequest;
+import java.lang.Throwable;
+import java.util.Collections;
 import java.util.HashMap;
 
-class Validator {
+class Cognito {
 	
 	final region:String;
 	final userPoolId:String;
@@ -32,9 +34,39 @@ class Validator {
 			.build();
 	}
 	
+	public function list() {
+		return try {
+			var ret = [];
+			var paginationToken = null;
+			
+			do {
+				final result = client.listUsers({
+					new ListUsersRequest()
+						.withUserPoolId(userPoolId)
+						.withPaginationToken(paginationToken);
+				});
+				
+				paginationToken = result.getPaginationToken();
+				trace('paginationToken', paginationToken);
+				
+				ret = ret.concat([for(user in result.getUsers()) user]);
+			} while (paginationToken != null);
+			
+			ret;
+			
+		} catch (ex) {
+			switch Std.downcast(cast ex, Throwable) {
+				case null: // skip
+				case e: e.printStackTrace();
+			}
+			
+			[];
+		}
+	}
+	
 	public function exists(username:String):Bool {
 		return try {
-			final result = get(username);
+			final result = _get(username);
 			result.getEnabled();
 		} catch (ex) {
 			switch Std.downcast(cast ex, Throwable) {
@@ -45,13 +77,26 @@ class Validator {
 		}
 	}
 	
+	
+	public function get(username:String) {
+		return try {
+			_get(username);
+		} catch (ex) {
+			switch Std.downcast(cast ex, Throwable) {
+				case null: // skip
+				case e: e.printStackTrace();
+			}
+			null;
+		}
+	}
+	
 	public function validate(username:String, password:String) {
 		return try {
 			// checks if the password is correct
 			auth(username, password);
 			
 			// get the user and return its id
-			final result = get(username);
+			final result = _get(username);
 			final attributes = [
 				'username' => result.getUsername(),
 				'user_create_date' => formatDate(result.getUserCreateDate()),
@@ -74,7 +119,7 @@ class Validator {
 		}
 	}
 	
-	function get(username:String) {
+	function _get(username:String) {
 		return client.adminGetUser({
 			new AdminGetUserRequest()
 				.withUserPoolId(userPoolId)
