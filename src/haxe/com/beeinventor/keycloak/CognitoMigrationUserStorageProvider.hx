@@ -1,5 +1,9 @@
 package com.beeinventor.keycloak;
 
+import sys.thread.Lock;
+import sys.thread.Thread;
+import org.keycloak.models.UserProvider;
+import org.keycloak.storage.user.SynchronizationResult;
 import haxe.DynamicAccess;
 import java.util.Collections;
 import org.keycloak.component.ComponentModel;
@@ -15,6 +19,9 @@ import org.keycloak.storage.user.UserLookupProvider;
 import org.keycloak.storage.UserStorageProvider;
 
 class CognitoMigrationUserStorageProvider implements UserStorageProvider implements UserLookupProvider implements CredentialInputValidator {
+	
+	public static inline final WEBHOOK_BATCH_SIZE = 100;
+	
 	final session:KeycloakSession;
 	final model:ComponentModel;
 	final cognito:Cognito;
@@ -97,18 +104,20 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 	}
 
 	public overload function getUserByEmail(realm:RealmModel, email:String):UserModel {
-		return if (cognito.exists(email)) {
-			switch session.userLocalStorage().getUserByEmail(realm, email) {
-				case null:
-					final user = session.userLocalStorage().addUser(realm, email);
-					user.setEmail(email);
-					user.setFederationLink(model.getId());
-					user;
-				case user:
-					user;
-			}
-		} else {
-			null;
+		return switch cognito.get(email) {
+			case null:
+				null;
+			case remote:
+				createUsersIfNotExists(
+					session.userLocalStorage(),
+					realm,
+					model,
+					webhooks,
+					[{
+						username: remote.getUsername(),
+						attributes: [for(attr in remote.getUserAttributes()) attr.getName() => attr.getValue()],
+					}]
+				)[0];
 		}
 	}
 
@@ -130,5 +139,69 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 
 	public overload function getUserByUsername(username:String, realm:RealmModel):UserModel {
 		return getUserByUsername(realm, username);
+	}
+	
+	public static function createUsersIfNotExists(localStorage:UserProvider, realm:RealmModel, model:ComponentModel, webhooks:Webhooks, remoteUsers:Array<{username:String, attributes:Map<String, String>}>, ?result:SynchronizationResult):Array<UserModel> {
+		final webhookPayloads:Array<Webhooks.UserPayload> = [];
+		final ret:Array<UserModel> = [];
+
+		for (remote in remoteUsers) {
+			final attributes = remote.attributes;
+			if (localStorage.searchForUserByUserAttributeStream(realm, 'cognito_sub', attributes['sub']).count() == 0) {
+				if(result != null) result.increaseAdded();
+				final username = remote.username;
+				final local = localStorage.addUser(realm, username);
+				ret.push(local);
+				switch attributes['email'] {
+					case null: // skip
+					case email: local.setEmail(email);
+				}
+
+				for (key => value in attributes)
+					local.setAttribute('cognito_$key', Collections.singletonList(value));
+
+				local.setFederationLink(model.getId());
+
+				// webhook
+				webhookPayloads.push({
+					id: local.getId(),
+					attributes: {
+						final attr = new DynamicAccess();
+						for (key => value in attributes)
+							attr['cognito_$key'] = value;
+						attr;
+					}
+				});
+			}
+		}
+
+		// run webhooks in parallel
+		final lock = new Lock();
+		final batches = Math.ceil(webhookPayloads.length / WEBHOOK_BATCH_SIZE);
+		for (i in 0...batches) {
+			final payloads = webhookPayloads.slice(i * WEBHOOK_BATCH_SIZE, (i+1) * WEBHOOK_BATCH_SIZE);
+			Thread.create(() -> {
+				// invoke webhook
+				switch webhooks.onAccountCreated {
+					case null: // skip
+					case webhook:
+						final result = webhook.invoke('POST', {
+							final headers = [];
+							switch webhooks.auth {
+								case null | '': // skip
+								case v: headers.push({name: 'Authorization', value: v});
+							}
+							headers;
+						}, payloads);
+				}
+
+				lock.release();
+			});
+		}
+
+		for (_ in 0...batches)
+			lock.wait();
+		
+		return ret;
 	}
 }

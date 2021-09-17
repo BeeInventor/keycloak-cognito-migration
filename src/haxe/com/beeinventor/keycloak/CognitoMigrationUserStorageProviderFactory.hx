@@ -1,8 +1,6 @@
 package com.beeinventor.keycloak;
 
-import haxe.DynamicAccess;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.component.ComponentValidationException;
@@ -20,8 +18,6 @@ import org.keycloak.storage.UserStorageProvider;
 import org.keycloak.storage.UserStorageProviderFactory;
 import org.keycloak.storage.UserStorageProviderModel;
 import org.keycloak.storage.UserStorageProviderSpi;
-import sys.thread.Lock;
-import sys.thread.Thread;
 import tink.Adhoc;
 
 class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderFactory<CognitoMigrationUserStorageProvider>
@@ -35,7 +31,6 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 	public static inline final WEBHOOK_AUTH_HEADER = 'webhook-auth-header';
 	public static inline final WEBHOOK_ON_ACCOUNT_CREATED = 'webhook-on-account-created';
 	public static inline final WEBHOOK_ON_CREDENTIALS_MIGRATED = 'webhook-on-credentials-migrated';
-	public static inline final WEBHOOK_BATCH_SIZE = 200;
 
 	public function new() {}
 
@@ -221,66 +216,18 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 
 		KeycloakModelUtils.runJobInTransaction(sessionFactory, new Adhoc<KeycloakSessionTask>(null, {
 			run: (_, session:KeycloakSession) -> {
-				final realm = session.realms().getRealm(realmId);
-				final localStorage = session.userLocalStorage();
-				final remoteUsers = cognito.list();
-				final webhookPayloads:Array<Webhooks.UserPayload> = [];
-
-				for (remote in remoteUsers) {
-					final attributes = [for (attr in remote.getAttributes()) attr.getName() => attr.getValue()];
-					if (localStorage.searchForUserByUserAttributeStream(realm, 'cognito_sub', attributes['sub']).count() == 0) {
-						result.increaseAdded();
-						final username = remote.getUsername();
-						final local = localStorage.addUser(realm, username);
-						switch attributes['email'] {
-							case null: // skip
-							case email: local.setEmail(email);
-						}
-
-						for (key => value in attributes)
-							local.setAttribute('cognito_$key', Collections.singletonList(value));
-
-						local.setFederationLink(model.getId());
-
-						// webhook
-						webhookPayloads.push({
-							id: local.getId(),
-							attributes: {
-								final attr = new DynamicAccess();
-								for (key => value in attributes)
-									attr['cognito_$key'] = value;
-								attr;
-							}
-						});
-					}
-				}
-
-				// run webhooks in parallel
-				final lock = new Lock();
-				final batches = Math.ceil(webhookPayloads.length / WEBHOOK_BATCH_SIZE);
-				for (i in 0...batches) {
-					final payloads = webhookPayloads.slice(i * WEBHOOK_BATCH_SIZE, (i+1) * WEBHOOK_BATCH_SIZE);
-					Thread.create(() -> {
-						// invoke webhook
-						switch webhooks.onAccountCreated {
-							case null: // skip
-							case webhook:
-								final result = webhook.invoke('POST', {
-									final headers = [];
-									switch webhooks.auth {
-										case null | '': // skip
-										case v: headers.push({name: 'Authorization', value: v});
-									}
-									headers;
-								}, payloads);
-						}
-
-						lock.release();
-					});
-				}
-
-				for (_ in 0...batches)
-					lock.wait();
+				CognitoMigrationUserStorageProvider.createUsersIfNotExists(
+					session.userLocalStorage(),
+					session.realms().getRealm(realmId),
+					model,
+					webhooks,
+					cognito.list()
+						.map(remote -> {
+							username: remote.getUsername(),
+							attributes: [for (attr in remote.getAttributes()) attr.getName() => attr.getValue()],
+						}),
+					result
+				);
 			}
 		}));
 
