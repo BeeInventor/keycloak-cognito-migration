@@ -8,8 +8,10 @@ import com.amazonaws.services.cognitoidp.model.AdminGetUserRequest;
 import com.amazonaws.services.cognitoidp.model.AdminInitiateAuthRequest;
 import com.amazonaws.services.cognitoidp.model.AuthFlowType;
 import com.amazonaws.services.cognitoidp.model.ListUsersRequest;
+import haxe.crypto.Hmac;
+import haxe.crypto.Base64;
+import haxe.io.Bytes;
 import java.lang.Throwable;
-import java.util.Collections;
 import java.util.HashMap;
 
 class Cognito {
@@ -139,7 +141,11 @@ class Cognito {
 					params.put('PASSWORD', password);
 					switch clientSecret {
 						case null | '': // skip
-						case _: params.put('SECRET_HASH', clientSecret);
+						case _: 
+							// https://docs.aws.amazon.com/cognito/latest/developerguide/signing-up-users-in-your-app.html#cognito-user-pools-computing-secret-hash
+							final hmac = new Hmac(SHA256); // consider using a java-native method
+							final hash = hmac.make(Bytes.ofString(clientSecret), Bytes.ofString(username + clientId));
+							params.put('SECRET_HASH', Base64.encode(hash));
 					}
 					params;
 				});
