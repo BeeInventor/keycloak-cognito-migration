@@ -216,7 +216,7 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 
 		KeycloakModelUtils.runJobInTransaction(sessionFactory, new Adhoc<KeycloakSessionTask>(null, {
 			run: (_, session:KeycloakSession) -> {
-				CognitoMigrationUserStorageProvider.createUsersIfNotExists(
+				CognitoMigrationUserStorageProvider.createUsersIfNotExist(
 					session.userLocalStorage(),
 					session.realms().getRealm(realmId),
 					model,

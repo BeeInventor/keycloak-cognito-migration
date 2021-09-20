@@ -108,7 +108,7 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 			case null:
 				null;
 			case remote:
-				createUsersIfNotExists(
+				createUsersIfNotExist(
 					session.userLocalStorage(),
 					realm,
 					model,
@@ -141,7 +141,7 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 		return getUserByUsername(realm, username);
 	}
 	
-	public static function createUsersIfNotExists(localStorage:UserProvider, realm:RealmModel, model:ComponentModel, webhooks:Webhooks, remoteUsers:Array<{username:String, attributes:Map<String, String>}>, ?result:SynchronizationResult):Array<UserModel> {
+	public static function createUsersIfNotExist(localStorage:UserProvider, realm:RealmModel, model:ComponentModel, webhooks:Webhooks, remoteUsers:Array<{username:String, attributes:Map<String, String>}>, ?result:SynchronizationResult):Array<UserModel> {
 		final webhookPayloads:Array<Webhooks.UserPayload> = [];
 		final ret:Array<UserModel> = [];
 
@@ -179,7 +179,7 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 		final lock = new Lock();
 		final batches = Math.ceil(webhookPayloads.length / WEBHOOK_BATCH_SIZE);
 		for (i in 0...batches) {
-			final payloads = webhookPayloads.slice(i * WEBHOOK_BATCH_SIZE, (i+1) * WEBHOOK_BATCH_SIZE);
+			final payloads = webhookPayloads.slice(i * WEBHOOK_BATCH_SIZE, (i + 1) * WEBHOOK_BATCH_SIZE);
 			Thread.create(() -> {
 				// invoke webhook
 				switch webhooks.onAccountCreated {
