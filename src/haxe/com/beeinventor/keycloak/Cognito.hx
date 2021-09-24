@@ -54,6 +54,7 @@ class Cognito {
 				ret = ret.concat([for(user in result.getUsers()) user]);
 			} while (paginationToken != null);
 			
+			trace('got ${ret.length} users');
 			ret;
 			
 		} catch (ex) {
