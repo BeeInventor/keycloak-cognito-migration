@@ -4,9 +4,6 @@
 	<properties>
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
-		<group.id>com.beeinventor</group.id>
-		<artifact.id>keycloak-cognito-migration</artifact.id>
-		<github.global.server>github</github.global.server>
 	</properties>
 
 	<groupId>com.beeinventor</groupId>
@@ -103,11 +100,6 @@
 						</goals>
 					</execution>
 				</executions>
-			</plugin>
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
-				<version>2.6</version>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
