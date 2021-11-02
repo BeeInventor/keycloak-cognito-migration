@@ -135,7 +135,7 @@ class CognitoMigrationUserStorageProviderFactory implements UserStorageProviderF
 			switch config.getFirst(name) {
 				case null | '':
 					// WORKAROUND: the second param is for https://github.com/HaxeFoundation/haxe/issues/10380
-					throw new ComponentValidationException('Missing Configuration: $name', name);
+					throw new ComponentValidationException('Missing Configuration: $name', (null:java.lang.Throwable));
 				case _:
 					// ok
 			}
