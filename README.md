@@ -22,10 +22,14 @@ When an user is successfully migrated, its attributes in Cognito will also be co
 
 #### Webhook
 
-There is a "On Success" webhook configuration. When set, the plugin will invoke the webhook with a POST method and a JSON payload in the form shown below (typescript notation):
+There is a "On Account Created" and "On Credentials Migrated" webhook configuration.
+
+When set, the plugin will invoke the webhook with a POST method and a JSON payload in the form shown below (typescript notation):
+
+Note: Payload of "On Account Created" is an array, because accounts can be bulk-created via the Sync button
 
 ```ts
-interface OnSuccessWebhookPayload {
+interface WebhookPayload {
   id: string;
   attributes: Record<string, string>;
 }
@@ -48,6 +52,16 @@ Example:
   }
 }
 ```
+
+## Search API
+
+This plugin also exposes an API that allow searching migrated users by their Cognito ID and will return the Keycloak User ID if found, or null otherwise.
+
+| -- | -- |
+| Method | GET |
+| Path | `/realms/master/cognito-migration/search` |
+| Query | id:string, realm:string |
+| Response | {result:null|string} |
 
 ## Canveat
 

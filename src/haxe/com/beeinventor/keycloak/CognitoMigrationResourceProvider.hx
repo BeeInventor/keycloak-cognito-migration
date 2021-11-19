@@ -20,12 +20,13 @@ class CognitoMigrationResourceProvider implements RealmResourceProvider {
 	@:meta(javax.ws.rs.GET())
 	@:meta(javax.ws.rs.Path(value = 'search'))
 	@:meta(javax.ws.rs.Produces(value = ['application/json']))
-	// TODO: use QueryParam (see: https://github.com/HaxeFoundation/haxe/issues/10397)
 	public function search(
 		@:meta(javax.ws.rs.QueryParam(value = 'realm')) realm:String,
 		@:meta(javax.ws.rs.QueryParam(value = 'id')) id:String
 	):String {
 		final realm = session.realmLocalStorage().getRealm(realm);
+		
+		// TODO: realm can be null
 		final user = session.userLocalStorage().searchForUserByUserAttributeStream(realm, 'cognito_sub', id).findFirst();
 		
 		return haxe.Json.stringify({
