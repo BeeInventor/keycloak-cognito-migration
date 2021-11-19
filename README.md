@@ -57,11 +57,14 @@ Example:
 
 This plugin also exposes an API that allow searching migrated users by their Cognito ID and will return the Keycloak User ID if found, or null otherwise.
 
+|  |  |
 | -- | -- |
 | Method | GET |
 | Path | `/realms/master/cognito-migration/search` |
-| Query | id:string, realm:string |
-| Response | {result:null|string} |
+| Query Param | id (cognito id), realm |
+| Response | `{result:null\|string}` |
+
+Example: `curl http://localhost:8080/admin/realms/master/cognito-migration/search?id=my-cognito-id&realm=my-realm`
 
 ## Canveat
 
