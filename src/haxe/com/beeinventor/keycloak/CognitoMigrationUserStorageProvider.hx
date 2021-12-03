@@ -183,28 +183,19 @@ class CognitoMigrationUserStorageProvider implements UserStorageProvider impleme
 		trace('invoking $batches webhook(s)');
 		for (i in 0...batches) {
 			final payloads = webhookPayloads.slice(i * WEBHOOK_BATCH_SIZE, (i + 1) * WEBHOOK_BATCH_SIZE);
-			Thread.create(() -> {
-				// invoke webhook
-				switch webhooks.onAccountCreated {
-					case null: // skip
-					case webhook:
-						final result = webhook.invoke('POST', {
-							final headers = [];
-							switch webhooks.auth {
-								case null | '': // skip
-								case v: headers.push({name: 'Authorization', value: v});
-							}
-							headers;
-						}, payloads);
-				}
-
-				lock.release();
-			});
-		}
-
-		for (i in 0...batches) {
-			trace('webhook $i done');
-			lock.wait();
+			// invoke webhook
+			switch webhooks.onAccountCreated {
+				case null: // skip
+				case webhook:
+					final result = webhook.invoke('POST', {
+						final headers = [];
+						switch webhooks.auth {
+							case null | '': // skip
+							case v: headers.push({name: 'Authorization', value: v});
+						}
+						headers;
+					}, payloads);
+			}
 		}
 		
 		return ret;
