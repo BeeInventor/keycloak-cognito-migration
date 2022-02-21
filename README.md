@@ -76,7 +76,7 @@ So make sure your realm's policies match those in your Cognito user pool.
 
 1. Start the devcontainer
 1. To compile the plugin as a deployable jar:  
-  `mvn compile assembly:single`
+  `mvn package`
 1. To deploy to keycloak which is running in docker compose:  
   `cp target/*.jar .devcontainer/keycloak/deployments/`  
   (Keycloak will hot reload the provider when the jar is changed)
